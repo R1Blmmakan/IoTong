@@ -1,0 +1,8 @@
+{
+  "clangd.arguments": [
+    "--query-driver=C:/Users/fikri/.platformio/packages/toolchain-xtensa-esp32/bin/*",
+    "--background-index",
+    "--completion-style=detailed",
+    "--header-insertion=never"
+  ]
+}
