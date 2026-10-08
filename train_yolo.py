@@ -1,9 +1,25 @@
 import os
-import torch
-from ultralytics import YOLO
+import sys
+
+# PyTorch ROCm 6.1 (PyTorch 2.1.2) dikompilasi dengan C-API NumPy 1.x.
+# NumPy 2.x menyebabkan 'RuntimeError: Numpy is not available' saat tensor_numpy dipanggil.
+try:
+    import numpy as np
+    if np.__version__.startswith("2."):
+        print(f"[HOTFIX] NumPy {np.__version__} terdeteksi! ROCm PyTorch 2.1.2 membutuhkan NumPy < 2.0.0.")
+        print("[HOTFIX] Mendowngrade NumPy ke 1.26.4 secara otomatis di dalam container...")
+        import subprocess
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "numpy<2.0.0"])
+        print("[HOTFIX] NumPy berhasil didowngrade. Merestart proses training...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+except Exception as e:
+    print(f"[WARN] Pengecekan NumPy hotfix: {e}")
 
 # Cegah Ultralytics mencoba download/update package mendadak saat runtime
 os.environ["YOLO_AUTOINSTALL"] = "False"
+
+import torch
+from ultralytics import YOLO
 
 # Prioritaskan dataset gabungan (43 kelas) jika ada, fallback ke TrashType
 default_dataset = "dataset_raw/yolo_waste_merged/data.yaml"
