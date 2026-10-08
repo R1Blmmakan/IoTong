@@ -1,0 +1,5 @@
+# IoTong Computer Vision & Machine Learning Dependencies
+ultralytics>=8.3.0
+opencv-python>=4.8.0
+pyserial>=3.5
+python-dotenv>=1.0.0
