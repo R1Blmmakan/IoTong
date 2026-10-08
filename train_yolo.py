@@ -7,10 +7,10 @@ try:
     import numpy as np
     if np.__version__.startswith("2."):
         print(f"[HOTFIX] NumPy {np.__version__} terdeteksi! ROCm PyTorch 2.1.2 membutuhkan NumPy < 2.0.0.")
-        print("[HOTFIX] Mendowngrade NumPy ke 1.26.4 secara otomatis di dalam container...")
+        print("[HOTFIX] Mendowngrade NumPy ke 1.26.4 dan OpenCV kompatibel...")
         import subprocess
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "numpy<2.0.0"])
-        print("[HOTFIX] NumPy berhasil didowngrade. Merestart proses training...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "numpy<2.0.0", "opencv-python-headless<5.0.0"])
+        print("[HOTFIX] Environment siap. Merestart proses training...")
         os.execv(sys.executable, [sys.executable] + sys.argv)
 except Exception as e:
     print(f"[WARN] Pengecekan NumPy hotfix: {e}")
@@ -47,8 +47,8 @@ if not os.path.exists(dataset_config):
     exit(1)
 
 model_base = os.getenv("MODEL_BASE", "yolo11n.pt")
-epochs = int(os.getenv("EPOCHS", "50"))
-batch_size = int(os.getenv("BATCH", "16"))
+epochs = int(os.getenv("EPOCHS", "12"))
+batch_size = int(os.getenv("BATCH", "32"))
 img_size = int(os.getenv("IMGSZ", "640"))
 
 default_device = "0" if torch.cuda.is_available() else "cpu"

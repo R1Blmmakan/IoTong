@@ -15,9 +15,10 @@ services:
       - HSA_ENABLE_SDMA=0
       - MIOPEN_FIND_MODE=2
       - MIOPEN_USER_DB_PATH=/tmp/miopen
+      - YOLO_CONFIG_DIR=/tmp/Ultralytics
       - DEVICE=0
-      - EPOCHS=50
-      - BATCH=16
+      - EPOCHS=12
+      - BATCH=32
       - IMGSZ=640
       - WORKERS=2
       - AMP=False
