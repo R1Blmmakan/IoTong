@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import argparse
 import cv2
 import serial
 import serial.tools.list_ports
@@ -63,6 +64,59 @@ TRASH_MAP = {
     "cell phone":   ("Elektronik / HP", "B3", 180, (0, 0, 255)),
 }
 
+def probe_available_cameras(max_search=4):
+    available = []
+    for idx in range(max_search):
+        # DirectShow on Windows avoids MSMF delay on non-existent devices
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW) if sys.platform.startswith("win") else cv2.VideoCapture(idx)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                available.append(idx)
+            cap.release()
+    return available
+
+def open_camera(source, width=640, height=480):
+    if isinstance(source, int):
+        # Prefer DirectShow on Windows for reliable index binding
+        if sys.platform.startswith("win"):
+            cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                return cap
+        cap = cv2.VideoCapture(source)
+    else:
+        cap = cv2.VideoCapture(source)
+
+    if cap.isOpened():
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+    return cap
+
+def resolve_camera_source(configured_source, force_select=False):
+    is_interactive = force_select or str(configured_source).strip().upper() in ("SELECT", "CHOOSE", "MENU", "AUTO")
+    if is_interactive:
+        print("[CAMERA] Memindai kamera yang terhubung...")
+        available = probe_available_cameras()
+        if not available:
+            print("[CAMERA WARNING] Tidak ada kamera yang terdeteksi otomatis.")
+            val = input("Masukkan index kamera (default 0): ").strip()
+            return int(val) if val.isdigit() else 0
+
+        print("\nPerangkat Kamera Terdeteksi:")
+        for idx in available:
+            label = "Webcam Eksternal" if idx > 0 else "Kamera Utama / Built-in"
+            print(f"  [{idx}] Index {idx} ({label})")
+
+        choice = input(f"\nPilih nomor kamera {available} [default {available[0]}]: ").strip()
+        if choice.isdigit():
+            return int(choice)
+        return available[0]
+
+    raw = str(configured_source).strip()
+    return int(raw) if raw.isdigit() else raw
+
 def find_esp32_port():
     """Mencari port serial ESP32 / USB UART secara otomatis."""
     ports = list(serial.tools.list_ports.comports())
@@ -112,7 +166,15 @@ def send_servo_command(ser, angle):
         print(f">> [ESP32 SENT] Mengirim perintah: {cmd.strip()}")
 
 def main():
-    print(f"[ENV] Serial: {SERIAL_PORT} ({BAUD_RATE} baud) | Cam: {CAMERA_SOURCE} ({FRAME_WIDTH}x{FRAME_HEIGHT})")
+    parser = argparse.ArgumentParser(description="IoTong AI Waste Detection")
+    parser.add_argument("--cam", "-c", default=None, help="Index kamera atau URL stream")
+    parser.add_argument("--select-cam", action="store_true", help="Pilih kamera secara interaktif saat mulai")
+    args, _ = parser.parse_known_args()
+
+    target_cam = args.cam if args.cam is not None else CAMERA_SOURCE
+    active_cam = resolve_camera_source(target_cam, force_select=args.select_cam)
+
+    print(f"[ENV] Serial: {SERIAL_PORT} ({BAUD_RATE} baud) | Cam: {active_cam} ({FRAME_WIDTH}x{FRAME_HEIGHT})")
     print(f"[ENV] Model: {MODEL_PATH} | Deteksi: {CONF_THRESHOLD*100:.0f}% | Trigger Servo: {SERVO_TRIGGER_CONF*100:.0f}%")
 
     ser = init_serial(SERIAL_PORT, BAUD_RATE)
@@ -121,14 +183,23 @@ def main():
     model = YOLO(MODEL_PATH)
     print("[YOLO] Model siap digunakan!")
 
-    cap = cv2.VideoCapture(CAMERA_SOURCE)
-    if not cap.isOpened():
-        print(f"[ERROR] Kamera '{CAMERA_SOURCE}' tidak dapat dibuka!")
-        print("Tip: Cek koneksi webcam atau sesuaikan CAMERA_SOURCE di file .env")
-        return
-
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+    cap = open_camera(active_cam, FRAME_WIDTH, FRAME_HEIGHT)
+    if not cap or not cap.isOpened():
+        print(f"[ERROR] Kamera '{active_cam}' tidak dapat dibuka!")
+        print("[CAMERA] Mencari kamera alternatif yang terhubung...")
+        available = probe_available_cameras()
+        fallback_found = False
+        for alt in available:
+            if alt != active_cam:
+                cap = open_camera(alt, FRAME_WIDTH, FRAME_HEIGHT)
+                if cap and cap.isOpened():
+                    print(f"[CAMERA] Beralih otomatis ke kamera alternatif: Index {alt}")
+                    active_cam = alt
+                    fallback_found = True
+                    break
+        if not fallback_found:
+            print("Tip: Cek koneksi USB webcam atau pastikan webcam tidak sedang dipakai aplikasi lain.")
+            return
 
     total_area = FRAME_WIDTH * FRAME_HEIGHT
     roi_x1 = int(FRAME_WIDTH * 0.15)
@@ -147,6 +218,7 @@ def main():
 
     if SHOW_GUI:
         print("\nKontrol Keyboard:")
+        print(" - 'c' : Ganti ke kamera berikutnya (Webcam <-> Built-in)")
         print(" - 'm' : Toggle flip horizontal kamera")
         print(" - 'q' : Keluar dari program\n")
 
@@ -255,7 +327,8 @@ def main():
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
                 flip_txt = "AKTIF" if is_flipped else "NONAKTIF"
                 trigger_pct = int(SERVO_TRIGGER_CONF * 100)
-                cv2.putText(annotated_frame, f"Model: {os.path.basename(MODEL_PATH)} | Trigger: >={trigger_pct}% | Flip [M]: {flip_txt}", (20, 65),
+                cam_label = f"Cam [{active_cam}]"
+                cv2.putText(annotated_frame, f"{cam_label} | Trigger: >={trigger_pct}% | [C] Ganti Cam | [M] Flip", (20, 65),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.40, (200, 200, 200), 1)
 
                 cv2.imshow("IoTong AI Detection", annotated_frame)
@@ -263,6 +336,23 @@ def main():
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
+                elif key in (ord('c'), ord('C')):
+                    if isinstance(active_cam, int):
+                        next_cam = 1 if active_cam == 0 else 0
+                        print(f"[CAMERA] Beralih ke kamera Index {next_cam}...")
+                        new_cap = open_camera(next_cam, FRAME_WIDTH, FRAME_HEIGHT)
+                        if new_cap and new_cap.isOpened():
+                            ret_test, _ = new_cap.read()
+                            if ret_test:
+                                cap.release()
+                                cap = new_cap
+                                active_cam = next_cam
+                                print(f"[CAMERA] Aktif di kamera Index {active_cam}.")
+                            else:
+                                new_cap.release()
+                                print(f"[CAMERA WARNING] Kamera Index {next_cam} tidak mengirim frame.")
+                        else:
+                            print(f"[CAMERA WARNING] Gagal membuka kamera Index {next_cam}.")
                 elif key in (ord('m'), ord('M')):
                     is_flipped = not is_flipped
                     print(f"[CAMERA] Flip horizontal diubah: {'AKTIF' if is_flipped else 'NONAKTIF'}")

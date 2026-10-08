@@ -1,12 +1,44 @@
 import os
+import sys
 import time
 import cv2
 from dotenv import load_dotenv
 
 load_dotenv()
 
-CAMERA_SOURCE = os.getenv("CAMERA_SOURCE", "0").strip()
-CAMERA_SOURCE = int(CAMERA_SOURCE) if CAMERA_SOURCE.isdigit() else CAMERA_SOURCE
+def probe_available_cameras(max_search=4):
+    available = []
+    for idx in range(max_search):
+        cap = cv2.VideoCapture(idx, cv2.CAP_DSHOW) if sys.platform.startswith("win") else cv2.VideoCapture(idx)
+        if cap.isOpened():
+            ret, _ = cap.read()
+            if ret:
+                available.append(idx)
+            cap.release()
+    return available
+
+def open_camera(source):
+    if isinstance(source, int):
+        if sys.platform.startswith("win"):
+            cap = cv2.VideoCapture(source, cv2.CAP_DSHOW)
+            if cap.isOpened():
+                return cap
+        return cv2.VideoCapture(source)
+    return cv2.VideoCapture(source)
+
+raw_cam = os.getenv("CAMERA_SOURCE", "0").strip()
+if raw_cam.upper() in ("SELECT", "CHOOSE", "MENU", "AUTO"):
+    print("[CAMERA] Memindai kamera yang terhubung...")
+    cams = probe_available_cameras()
+    if cams:
+        print(f"Perangkat kamera ditemukan: {cams}")
+        choice = input(f"Pilih nomor kamera {cams} [default {cams[0]}]: ").strip()
+        CAMERA_SOURCE = int(choice) if choice.isdigit() else cams[0]
+    else:
+        CAMERA_SOURCE = 0
+else:
+    CAMERA_SOURCE = int(raw_cam) if raw_cam.isdigit() else raw_cam
+
 FLIP_HORIZONTAL = os.getenv("FLIP_HORIZONTAL", "true").lower() in ("true", "1", "yes")
 
 OUTPUT_DIR = "dataset_raw"
@@ -20,8 +52,8 @@ CATEGORIES = {
 for cat in CATEGORIES.values():
     os.makedirs(os.path.join(OUTPUT_DIR, cat), exist_ok=True)
 
-cap = cv2.VideoCapture(CAMERA_SOURCE)
-if not cap.isOpened():
+cap = open_camera(CAMERA_SOURCE)
+if not cap or not cap.isOpened():
     print(f"[ERROR] Gagal membuka kamera {CAMERA_SOURCE}")
     exit(1)
 
