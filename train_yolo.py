@@ -2,7 +2,15 @@ import os
 import torch
 from ultralytics import YOLO
 
-data_cfg = os.getenv("DATASET_CONFIG", "dataset_raw/TrashType_Image_Dataset/data.yaml")
+# Cegah Ultralytics mencoba download/update package mendadak saat runtime
+os.environ["YOLO_AUTOINSTALL"] = "False"
+
+# Prioritaskan dataset gabungan (43 kelas) jika ada, fallback ke TrashType
+default_dataset = "dataset_raw/yolo_waste_merged/data.yaml"
+if not os.path.exists(default_dataset):
+    default_dataset = "dataset_raw/TrashType_Image_Dataset/data.yaml"
+
+data_cfg = os.getenv("DATASET_CONFIG", default_dataset)
 dataset_config = os.path.abspath(data_cfg)
 
 if not os.path.exists(dataset_config):
