@@ -73,11 +73,15 @@ Dataset `dataset_raw/` sudah tersedia langsung di dalam repositori. Cukup clone 
 #### Menggunakan Docker Compose (Direkomendasikan)
 
 
-1. **GPU AMD (Vega 56 / ROCm):**
+1. **GPU AMD RX Vega 56 / 64 (ROCm 6.1 Compatibility):**
+   ```bash
+   docker compose run --rm train-gpu-vega
+   ```
+2. **GPU AMD Modern (RDNA 2/3, CDNA via ROCm 10):**
    ```bash
    docker compose run --rm train-gpu
    ```
-2. **CPU Fallback (Jika tanpa driver ROCm):**
+3. **CPU Fallback (Paling Stabil & Langsung Jalan):**
    ```bash
    docker compose run --rm train-cpu
    ```

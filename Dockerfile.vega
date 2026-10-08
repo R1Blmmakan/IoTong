@@ -1,0 +1,20 @@
+FROM rocm/pytorch:6.1.2_ubuntu22.04_py3.10_pytorch_2.1.2
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    HSA_OVERRIDE_GFX_VERSION=9.0.0 \
+    PYTORCH_NO_HIP_MEMORY_CACHING=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ultralytics opencv-python-headless
+
+COPY . /app
+
+CMD ["python", "train_yolo.py"]

@@ -1,5 +1,33 @@
 services:
-  # Training dengan AMD GPU (Radeon RX Vega 56 via ROCm)
+  # Training dengan AMD GPU Radeon RX Vega 56 / 64 (ROCm 6.1 compatible build)
+  train-gpu-vega:
+    build:
+      context: .
+      dockerfile: Dockerfile.vega
+    container_name: iotong-train-gpu-vega
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - HSA_OVERRIDE_GFX_VERSION=9.0.0
+      - PYTORCH_NO_HIP_MEMORY_CACHING=1
+      - DEVICE=0
+      - EPOCHS=50
+      - BATCH=16
+      - IMGSZ=640
+      - AMP=False
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python train_yolo.py
+
+  # Training dengan AMD GPU modern (RDNA 2/3, CDNA 2/3 via official ROCm image)
   train-gpu:
     image: ultralytics/ultralytics:latest-amd
     container_name: iotong-train-gpu
@@ -8,16 +36,17 @@ services:
       - seccomp:unconfined
     environment:
       - HSA_OVERRIDE_GFX_VERSION=9.0.0
-      - PYTORCH_ROCM_ARCH=gfx900
       - DEVICE=0
       - EPOCHS=50
       - BATCH=16
       - IMGSZ=640
+      - AMP=False
     devices:
       - /dev/kfd
       - /dev/dri
     group_add:
       - video
+      - render
     volumes:
       - .:/app
     working_dir: /app

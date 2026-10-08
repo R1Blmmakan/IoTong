@@ -16,11 +16,13 @@ img_size = int(os.getenv("IMGSZ", "640"))
 
 default_device = "0" if torch.cuda.is_available() else "cpu"
 device = os.getenv("DEVICE", default_device)
+amp_enabled = os.getenv("AMP", "True").lower() not in ("false", "0", "no")
 
 print(f"[TRAIN] Model base: {model_base}")
 print(f"[TRAIN] Device: {device} (cuda/rocm available: {torch.cuda.is_available()})")
 print(f"[TRAIN] Dataset: {dataset_config}")
 print(f"[TRAIN] Epochs: {epochs}, Batch size: {batch_size}, Image size: {img_size}")
+print(f"[TRAIN] AMP (Mixed Precision): {amp_enabled}")
 
 model = YOLO(model_base)
 results = model.train(
@@ -29,6 +31,7 @@ results = model.train(
     imgsz=img_size,
     batch=batch_size,
     device=device,
+    amp=amp_enabled,
     plots=True
 )
 
