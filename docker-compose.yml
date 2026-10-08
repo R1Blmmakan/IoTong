@@ -6,15 +6,20 @@ services:
       dockerfile: Dockerfile.vega
     container_name: iotong-train-gpu-vega
     ipc: host
+    shm_size: '8g'
     security_opt:
       - seccomp:unconfined
     environment:
       - HSA_OVERRIDE_GFX_VERSION=9.0.0
       - PYTORCH_NO_HIP_MEMORY_CACHING=1
+      - HSA_ENABLE_SDMA=0
+      - MIOPEN_FIND_MODE=2
+      - MIOPEN_USER_DB_PATH=/tmp/miopen
       - DEVICE=0
       - EPOCHS=50
       - BATCH=16
       - IMGSZ=640
+      - WORKERS=2
       - AMP=False
     devices:
       - /dev/kfd

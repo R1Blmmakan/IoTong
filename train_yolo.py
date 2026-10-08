@@ -15,10 +15,23 @@ try:
 except Exception as e:
     print(f"[WARN] Pengecekan NumPy hotfix: {e}")
 
+# Konfigurasi stabilitas AMD ROCm untuk arsitektur Vega (gfx900)
+# 1. HSA_ENABLE_SDMA=0: Matikan SDMA hardware engine yang sering race condition / desync PCIe
+# 2. MIOPEN_FIND_MODE=2: Gunakan mode Fast FindDb untuk mencegah benchmarking crash pada kernel konvolusi
+os.environ.setdefault("HSA_ENABLE_SDMA", "0")
+os.environ.setdefault("MIOPEN_FIND_MODE", "2")
+os.environ.setdefault("MIOPEN_USER_DB_PATH", "/tmp/miopen")
+
 # Cegah Ultralytics mencoba download/update package mendadak saat runtime
 os.environ["YOLO_AUTOINSTALL"] = "False"
 
 import torch
+import torch.multiprocessing as mp
+try:
+    mp.set_sharing_strategy('file_system')
+except Exception:
+    pass
+
 from ultralytics import YOLO
 
 # Prioritaskan dataset gabungan (43 kelas) jika ada, fallback ke TrashType
@@ -42,10 +55,12 @@ default_device = "0" if torch.cuda.is_available() else "cpu"
 device = os.getenv("DEVICE", default_device)
 amp_enabled = os.getenv("AMP", "True").lower() not in ("false", "0", "no")
 
+workers = int(os.getenv("WORKERS", "2"))
+
 print(f"[TRAIN] Model base: {model_base}")
 print(f"[TRAIN] Device: {device} (cuda/rocm available: {torch.cuda.is_available()})")
 print(f"[TRAIN] Dataset: {dataset_config}")
-print(f"[TRAIN] Epochs: {epochs}, Batch size: {batch_size}, Image size: {img_size}")
+print(f"[TRAIN] Epochs: {epochs}, Batch size: {batch_size}, Image size: {img_size}, Workers: {workers}")
 print(f"[TRAIN] AMP (Mixed Precision): {amp_enabled}")
 
 model = YOLO(model_base)
@@ -54,6 +69,7 @@ results = model.train(
     epochs=epochs,
     imgsz=img_size,
     batch=batch_size,
+    workers=workers,
     device=device,
     amp=amp_enabled,
     plots=True
