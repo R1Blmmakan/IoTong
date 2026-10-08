@@ -63,3 +63,25 @@ python detect_trash.py
 ```
 * Sistem akan otomatis menghubungkan port serial ESP32 (jika dicolok) atau berjalan dalam **Mode Simulasi** jika ESP32 belum terhubung.
 * Tekan tombol **`q`** pada jendela kamera untuk keluar.
+
+---
+
+### 5. Training Model YOLO di ZimaOS / Server Docker
+
+Dataset `dataset_raw/` sudah tersedia langsung di dalam repositori. Cukup clone repositori ini ke server ZimaOS lalu jalankan:
+
+#### Menggunakan Docker Compose (Direkomendasikan)
+
+
+1. **GPU AMD (Vega 56 / ROCm):**
+   ```bash
+   docker compose run --rm train-gpu
+   ```
+2. **CPU Fallback (Jika tanpa driver ROCm):**
+   ```bash
+   docker compose run --rm train-cpu
+   ```
+
+Hasil training akan tersimpan di folder `runs/detect/train/weights/best.pt`.
+Salin bobot tersebut ke root direktori dan atur `MODEL_PATH=best.pt` pada `.env`.
+

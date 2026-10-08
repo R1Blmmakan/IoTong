@@ -1,0 +1,54 @@
+services:
+  # Training dengan AMD GPU (Radeon RX Vega 56 via ROCm)
+  train-gpu:
+    image: ultralytics/ultralytics:latest-amd
+    container_name: iotong-train-gpu
+    ipc: host
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - HSA_OVERRIDE_GFX_VERSION=9.0.0
+      - PYTORCH_ROCM_ARCH=gfx900
+      - DEVICE=0
+      - EPOCHS=50
+      - BATCH=16
+      - IMGSZ=640
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python train_yolo.py
+
+  # Fallback training menggunakan CPU jika driver ROCm host belum siap
+  train-cpu:
+    image: ultralytics/ultralytics:latest-cpu
+    container_name: iotong-train-cpu
+    environment:
+      - DEVICE=cpu
+      - EPOCHS=50
+      - BATCH=16
+      - IMGSZ=640
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python train_yolo.py
+
+  # Build lokal dari Dockerfile
+  train-custom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iotong-train-custom
+    environment:
+      - DEVICE=cpu
+      - EPOCHS=50
+      - BATCH=16
+      - IMGSZ=640
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: python train_yolo.py

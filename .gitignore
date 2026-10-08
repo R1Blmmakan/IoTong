@@ -16,10 +16,15 @@ venv/
 ENV/
 env/
 
-# Large Model Weights (YOLO downloads automatically)
+# Training Outputs & Checkpoints
+runs/
+*.cache
 *.pt
 *.onnx
 *.engine
+
+
+
 
 # VS Code User Overrides
 .vscode/.browse.c_cpp.db*
