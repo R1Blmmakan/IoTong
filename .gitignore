@@ -22,6 +22,8 @@ runs/
 *.pt
 *.onnx
 *.engine
+*.zip
+dataset_raw/yolo_waste*/
 
 
 

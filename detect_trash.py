@@ -36,7 +36,7 @@ STABLE_FRAMES_REQUIRED = int(os.getenv("STABLE_FRAMES_REQUIRED", "3"))
 
 # Mapping class model ke: (nama_sampah, jenis_kategori, sudut_servo, bgr_color)
 TRASH_MAP = {
-    # Model sampah khusus
+    # Model sampah khusus (TrashNet & Roboflow Waste Detection 42-classes)
     "paper":        ("Kertas", "Anorganik", 180, (0, 215, 255)),
     "cardboard":    ("Kardus", "Anorganik", 180, (0, 165, 255)),
     "plastic":      ("Plastik", "Anorganik", 90, (255, 191, 0)),
@@ -45,6 +45,47 @@ TRASH_MAP = {
     "glass":        ("Kaca", "Anorganik", 90, (255, 144, 30)),
     "bulky":        ("Sampah Campuran", "Anorganik", 90, (180, 105, 255)),
     "trash":        ("Sampah Umum", "Anorganik", 90, (180, 105, 255)),
+
+    # Roboflow 42-classes mapping
+    "aerosols":                             ("Kaleng Semprot / Aerosol", "B3", 180, (0, 0, 255)),
+    "aluminum can":                         ("Kaleng Aluminium", "Anorganik", 90, (200, 200, 200)),
+    "aluminum caps":                        ("Tutup Aluminium", "Anorganik", 90, (200, 200, 200)),
+    "cellulose":                            ("Selulosa / Kertas", "Anorganik", 180, (0, 215, 255)),
+    "ceramic":                              ("Keramik", "Anorganik", 90, (255, 144, 30)),
+    "combined plastic":                     ("Plastik Campuran", "Anorganik", 90, (255, 191, 0)),
+    "container for household chemicals":    ("Wadah Plastik Kimia", "Anorganik", 90, (255, 191, 0)),
+    "disposable tableware":                 ("Alat Makan Plastik", "Anorganik", 90, (255, 191, 0)),
+    "electronics":                          ("Elektronik", "B3", 180, (0, 0, 255)),
+    "foil":                                 ("Aluminium Foil", "Anorganik", 90, (200, 200, 200)),
+    "furniture":                            ("Mebel / Perabot", "Anorganik", 90, (180, 105, 255)),
+    "glass bottle":                         ("Botol Kaca", "Anorganik", 90, (255, 144, 30)),
+    "iron utensils":                        ("Peralatan Besi", "Anorganik", 90, (200, 200, 200)),
+    "liquid":                               ("Cairan Organik", "Organik", 0, (0, 255, 0)),
+    "metal shavings":                       ("Serpihan Logam", "Anorganik", 90, (200, 200, 200)),
+    "milk bottle":                          ("Botol Susu", "Anorganik", 90, (255, 191, 0)),
+    "paper bag":                            ("Kantong Kertas", "Anorganik", 180, (0, 215, 255)),
+    "paper cups":                           ("Gelas Kertas", "Anorganik", 180, (0, 215, 255)),
+    "paper shavings":                       ("Serpihan Kertas", "Anorganik", 180, (0, 215, 255)),
+    "papier mache":                         ("Bubur Kertas", "Anorganik", 180, (0, 215, 255)),
+    "plastic bag":                          ("Kantong Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic bottle":                       ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic can":                          ("Kaleng Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic canister":                     ("Jerigen Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic caps":                         ("Tutup Botol Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic cup":                          ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic shaker":                       ("Shaker Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic shavings":                     ("Serpihan Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic toys":                         ("Mainan Plastik", "Anorganik", 90, (255, 191, 0)),
+    "postal packaging":                     ("Kemasan Paket / Kardus", "Anorganik", 180, (0, 165, 255)),
+    "printing industry":                    ("Kertas Cetak", "Anorganik", 180, (0, 215, 255)),
+    "scrap metal":                          ("Besi / Logam Bekas", "Anorganik", 90, (200, 200, 200)),
+    "stretch film":                         ("Plastik Wrapping", "Anorganik", 90, (255, 191, 0)),
+    "tetra pack":                           ("Karton Tetra Pak", "Anorganik", 180, (0, 165, 255)),
+    "textile":                              ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
+    "tin":                                  ("Kaleng Timah", "Anorganik", 90, (200, 200, 200)),
+    "unknown plastic":                      ("Sampah Plastik", "Anorganik", 90, (255, 191, 0)),
+    "wood":                                 ("Kayu", "Organik", 0, (0, 255, 0)),
+    "zip plastic bag":                      ("Plastik Klip / Zip", "Anorganik", 90, (255, 191, 0)),
 
     # Fallback model COCO
     "banana":       ("Pisang", "Organik", 0, (0, 255, 0)),
@@ -276,8 +317,9 @@ def main():
                     if USE_ROI and not (roi_x1 <= cx <= roi_x2 and roi_y1 <= cy <= roi_y2):
                         continue
 
-                    if cls_name in TRASH_MAP:
-                        nama_sampah, jenis_sampah, sudut_servo, color = TRASH_MAP[cls_name]
+                    lookup_name = str(cls_name).strip().lower()
+                    if lookup_name in TRASH_MAP:
+                        nama_sampah, jenis_sampah, sudut_servo, color = TRASH_MAP[lookup_name]
 
                         if conf > best_conf:
                             best_conf = conf
