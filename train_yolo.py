@@ -9,6 +9,7 @@ try:
         print(f"[HOTFIX] NumPy {np.__version__} terdeteksi! ROCm PyTorch 2.1.2 membutuhkan NumPy < 2.0.0.")
         print("[HOTFIX] Mendowngrade NumPy ke 1.26.4 dan OpenCV kompatibel...")
         import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "opencv-python", "opencv-python-headless"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "numpy<2.0.0", "opencv-python-headless<5.0.0"])
         print("[HOTFIX] Environment siap. Merestart proses training...")
         os.execv(sys.executable, [sys.executable] + sys.argv)
