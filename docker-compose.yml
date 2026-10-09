@@ -18,7 +18,7 @@ services:
       - YOLO_CONFIG_DIR=/tmp/Ultralytics
       - DEVICE=0
       - EPOCHS=12
-      - BATCH=16
+      - BATCH=24
       - IMGSZ=640
       - WORKERS=2
       - AMP=False
