@@ -19,7 +19,12 @@ env/
 # Training Outputs & Checkpoints
 runs/
 *.cache
-*.pt
+best (1).pt
+best (2).pt
+bestold.pt
+bestold2.pt
+yolo11n.pt
+taco.pt
 *.onnx
 *.engine
 *.zip
