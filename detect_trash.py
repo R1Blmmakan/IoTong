@@ -34,81 +34,156 @@ MAX_BOX_AREA_RATIO = float(os.getenv("MAX_BOX_AREA_RATIO", "0.35"))
 USE_ROI = os.getenv("USE_ROI", "true").lower() in ("true", "1", "yes")
 STABLE_FRAMES_REQUIRED = int(os.getenv("STABLE_FRAMES_REQUIRED", "3"))
 
-# Mapping class model ke: (nama_sampah, jenis_kategori, sudut_servo, bgr_color)
-TRASH_MAP = {
-    # Model sampah khusus (TrashNet & Roboflow Waste Detection 42-classes)
-    "paper":        ("Kertas", "Anorganik", 180, (0, 215, 255)),
-    "cardboard":    ("Kardus", "Anorganik", 180, (0, 165, 255)),
-    "plastic":      ("Plastik", "Anorganik", 90, (255, 191, 0)),
-    "organic":      ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "biological":   ("Sampah Hayati / Organik", "Organik", 0, (0, 255, 0)),
-    "metal":        ("Logam / Kaleng", "Anorganik", 90, (200, 200, 200)),
-    "glass":        ("Kaca", "Anorganik", 90, (255, 144, 30)),
-    "battery":      ("Baterai Bekas", "B3", 180, (0, 0, 255)),
-    "medical-waste":("Limbah Medis / Masker", "B3", 180, (0, 0, 255)),
-    "clothes":      ("Pakaian / Tekstil", "Anorganik", 90, (180, 105, 255)),
-    "shoes":        ("Sepatu / Residu", "Anorganik", 90, (180, 105, 255)),
-    "bulky":        ("Sampah Campuran", "Anorganik", 90, (180, 105, 255)),
-    "trash":        ("Sampah Umum", "Anorganik", 90, (180, 105, 255)),
+# ==============================================================================
+# TAKSONOMI & PEMETAAN KATEGORI SAMPAH FLEKSIBEL (IoTong Smart Taxonomy)
+# ==============================================================================
+# Sudut Servo Fisik IoTong:
+#   - 0°   : Organik (Sisa makanan, buah, sayur, dedaunan)
+#   - 90°  : Anorganik (Plastik, Botol, Kaca, Logam/Stainless)
+#   - 180° : B3 & Elektronik (Kabel, Baterai, PCB, HP, Limbah Berbahaya) / Kertas
+# ==============================================================================
 
-    # Roboflow 42-classes mapping
-    "aerosols":                             ("Kaleng Semprot / Aerosol", "B3", 180, (0, 0, 255)),
-    "aluminum can":                         ("Kaleng Aluminium", "Anorganik", 90, (200, 200, 200)),
-    "aluminum caps":                        ("Tutup Aluminium", "Anorganik", 90, (200, 200, 200)),
-    "cellulose":                            ("Selulosa / Kertas", "Anorganik", 180, (0, 215, 255)),
-    "ceramic":                              ("Keramik", "Anorganik", 90, (255, 144, 30)),
-    "combined plastic":                     ("Plastik Campuran", "Anorganik", 90, (255, 191, 0)),
-    "container for household chemicals":    ("Wadah Plastik Kimia", "Anorganik", 90, (255, 191, 0)),
-    "disposable tableware":                 ("Alat Makan Plastik", "Anorganik", 90, (255, 191, 0)),
-    "electronics":                          ("Elektronik", "B3", 180, (0, 0, 255)),
-    "foil":                                 ("Aluminium Foil", "Anorganik", 90, (200, 200, 200)),
-    "furniture":                            ("Mebel / Perabot", "Anorganik", 90, (180, 105, 255)),
-    "glass bottle":                         ("Botol Kaca", "Anorganik", 90, (255, 144, 30)),
-    "iron utensils":                        ("Peralatan Besi", "Anorganik", 90, (200, 200, 200)),
-    "liquid":                               ("Cairan Organik", "Organik", 0, (0, 255, 0)),
-    "metal shavings":                       ("Serpihan Logam", "Anorganik", 90, (200, 200, 200)),
-    "milk bottle":                          ("Botol Susu", "Anorganik", 90, (255, 191, 0)),
-    "paper bag":                            ("Kantong Kertas", "Anorganik", 180, (0, 215, 255)),
-    "paper cups":                           ("Gelas Kertas", "Anorganik", 180, (0, 215, 255)),
-    "paper shavings":                       ("Serpihan Kertas", "Anorganik", 180, (0, 215, 255)),
-    "papier mache":                         ("Bubur Kertas", "Anorganik", 180, (0, 215, 255)),
-    "plastic bag":                          ("Kantong Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic bottle":                       ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic can":                          ("Kaleng Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic canister":                     ("Jerigen Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic caps":                         ("Tutup Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic cup":                          ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic shaker":                       ("Shaker Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic shavings":                     ("Serpihan Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic toys":                         ("Mainan Plastik", "Anorganik", 90, (255, 191, 0)),
-    "postal packaging":                     ("Kemasan Paket / Kardus", "Anorganik", 180, (0, 165, 255)),
-    "printing industry":                    ("Kertas Cetak", "Anorganik", 180, (0, 215, 255)),
-    "scrap metal":                          ("Besi / Logam Bekas", "Anorganik", 90, (200, 200, 200)),
-    "stretch film":                         ("Plastik Wrapping", "Anorganik", 90, (255, 191, 0)),
-    "tetra pack":                           ("Karton Tetra Pak", "Anorganik", 180, (0, 165, 255)),
-    "textile":                              ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
-    "tin":                                  ("Kaleng Timah", "Anorganik", 90, (200, 200, 200)),
-    "unknown plastic":                      ("Sampah Plastik", "Anorganik", 90, (255, 191, 0)),
-    "wood":                                 ("Kayu", "Organik", 0, (0, 255, 0)),
-    "zip plastic bag":                      ("Plastik Klip / Zip", "Anorganik", 90, (255, 191, 0)),
+# 1. Pemetaan Eksplisit (Exact Class Match dari berbagai dataset YOLO)
+EXPLICIT_TRASH_MAP = {
+    # --- E-Waste & Kabel (B3 / Elektronik -> 180°) ---
+    "cable":            ("Kabel Listrik / USB", "B3 / Elektronik", 180, (0, 0, 255)),
+    "cables":           ("Kabel Listrik / USB", "B3 / Elektronik", 180, (0, 0, 255)),
+    "wire":             ("Kabel / Kawat", "B3 / Elektronik", 180, (0, 0, 255)),
+    "wires":            ("Kabel / Kawat", "B3 / Elektronik", 180, (0, 0, 255)),
+    "cable charger":    ("Kabel Charger", "B3 / Elektronik", 180, (0, 0, 255)),
+    "patch cord":       ("Kabel Jaringan LAN", "B3 / Elektronik", 180, (0, 0, 255)),
+    "charger":          ("Charger / Adaptor", "B3 / Elektronik", 180, (0, 0, 255)),
+    "battery":          ("Baterai Bekas", "B3 / Elektronik", 180, (0, 0, 255)),
+    "batteries":        ("Baterai Bekas", "B3 / Elektronik", 180, (0, 0, 255)),
+    "e-waste":          ("Sampah Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
+    "electronics":      ("Komponen Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
+    "electronic":       ("Komponen Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
+    "pcb":              ("Papan Sirkuit PCB", "B3 / Elektronik", 180, (0, 0, 255)),
+    "circuit board":    ("Papan Sirkuit PCB", "B3 / Elektronik", 180, (0, 0, 255)),
+    "cell phone":       ("Handphone / Gadget", "B3 / Elektronik", 180, (0, 0, 255)),
+    "phone":            ("Handphone / Gadget", "B3 / Elektronik", 180, (0, 0, 255)),
+    "mouse":            ("Mouse Komputer", "B3 / Elektronik", 180, (0, 0, 255)),
+    "keyboard":         ("Keyboard Komputer", "B3 / Elektronik", 180, (0, 0, 255)),
+    "hazardous waste":  ("Limbah Berbahaya (B3)", "B3 / Elektronik", 180, (0, 0, 255)),
+    "medical-waste":    ("Limbah Medis / Masker", "B3 / Elektronik", 180, (0, 0, 255)),
+    "aerosols":         ("Kaleng Semprot / Aerosol", "B3 / Elektronik", 180, (0, 0, 255)),
 
-    # Fallback model COCO
-    "banana":       ("Pisang", "Organik", 0, (0, 255, 0)),
-    "apple":        ("Apel", "Organik", 0, (0, 255, 0)),
-    "orange":       ("Jeruk", "Organik", 0, (0, 255, 0)),
-    "broccoli":     ("Sayuran", "Organik", 0, (0, 255, 0)),
-    "carrot":       ("Wortel", "Organik", 0, (0, 255, 0)),
-    "sandwich":     ("Makanan", "Organik", 0, (0, 255, 0)),
-    "pizza":        ("Makanan", "Organik", 0, (0, 255, 0)),
-    "donut":        ("Makanan", "Organik", 0, (0, 255, 0)),
-    "bottle":       ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "cup":          ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
-    "book":         ("Buku / Kertas", "Anorganik", 180, (0, 215, 255)),
-    "fork":         ("Garpu Logam", "Anorganik", 90, (200, 200, 200)),
-    "knife":        ("Pisau Logam", "Anorganik", 90, (200, 200, 200)),
-    "spoon":        ("Sendok Logam", "Anorganik", 90, (200, 200, 200)),
-    "cell phone":   ("Elektronik / HP", "B3", 180, (0, 0, 255)),
+    # --- Logam, Stainless, & Kaleng (Anorganik Logam -> 90°) ---
+    "stainless":        ("Stainless Steel", "Anorganik (Logam)", 90, (220, 220, 220)),
+    "stainless steel":  ("Stainless Steel", "Anorganik (Logam)", 90, (220, 220, 220)),
+    "metal":            ("Logam / Besi", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "scrap metal":      ("Besi / Logam Bekas", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "metal shavings":   ("Serpihan Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "aluminum can":     ("Kaleng Aluminium", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "aluminum caps":    ("Tutup Aluminium", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "tin":              ("Kaleng Timah", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "iron utensils":    ("Peralatan Besi", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "foil":             ("Aluminium Foil", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "fork":             ("Garpu Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "knife":            ("Pisau Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
+    "spoon":            ("Sendok Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
+
+    # --- Plastik, Kaca, & Anorganik Umum (Anorganik -> 90°) ---
+    "plastic":          ("Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic bottle":   ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
+    "bottle":           ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
+    "cup":              ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic cup":      ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic bag":      ("Kantong Plastik", "Anorganik", 90, (255, 191, 0)),
+    "plastic caps":     ("Tutup Botol Plastik", "Anorganik", 90, (255, 191, 0)),
+    "glass":            ("Kaca", "Anorganik", 90, (255, 144, 30)),
+    "glass bottle":     ("Botol Kaca", "Anorganik", 90, (255, 144, 30)),
+    "ceramic":          ("Keramik", "Anorganik", 90, (255, 144, 30)),
+    "recyclable":       ("Sampah Daur Ulang", "Anorganik", 90, (255, 191, 0)),
+    "trash":            ("Sampah Anorganik", "Anorganik", 90, (180, 105, 255)),
+    "clothes":          ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
+    "textile":          ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
+
+    # --- Kertas & Kardus (Anorganik Kertas -> 180° atau 90°) ---
+    "paper":            ("Kertas", "Kertas / Karton", 180, (0, 215, 255)),
+    "cardboard":        ("Kardus", "Kertas / Karton", 180, (0, 165, 255)),
+    "book":             ("Buku / Kertas", "Kertas / Karton", 180, (0, 215, 255)),
+    "paper bag":        ("Kantong Kertas", "Kertas / Karton", 180, (0, 215, 255)),
+    "paper cups":       ("Gelas Kertas", "Kertas / Karton", 180, (0, 215, 255)),
+    "tetra pack":       ("Karton Kemasan", "Kertas / Karton", 180, (0, 165, 255)),
+
+    # --- Organik (Organik -> 0°) ---
+    "organic":          ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "biological":       ("Sampah Organik", "Organik", 0, (0, 255, 0)),
+    "food":             ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "banana":           ("Kulit Buah", "Organik", 0, (0, 255, 0)),
+    "apple":            ("Sisa Buah", "Organik", 0, (0, 255, 0)),
+    "orange":           ("Sisa Buah", "Organik", 0, (0, 255, 0)),
+    "sandwich":         ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "pizza":            ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "donut":            ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "vegetable":        ("Sayuran", "Organik", 0, (0, 255, 0)),
+    "wood":             ("Kayu / Ranting", "Organik", 0, (0, 255, 0)),
 }
+
+# 2. Aturan Kata Kunci Semantik (Dynamic Keyword Fallback)
+# Jika ada class baru hasil training yang belum didaftarkan di EXPLICIT_TRASH_MAP,
+# sistem otomatis mencocokkan kata kunci ke kategori dan sudut servo yang tepat:
+KEYWORD_RULES = [
+    # (daftar_kata_kunci, nama_display, kategori_display, sudut_servo, bgr_color)
+    (
+        ["cable", "wire", "cord", "charger", "usb", "patch", "lan", "lead"],
+        "Kabel / Kabel Charger", "B3 / Elektronik", 180, (0, 0, 255)
+    ),
+    (
+        ["battery", "batteries", "accumulator", "cell", "powerbank"],
+        "Baterai / Sel Daya", "B3 / Elektronik", 180, (0, 0, 255)
+    ),
+    (
+        ["electronic", "pcb", "circuit", "chip", "phone", "hardware", "laptop", "mouse", "keyboard", "e-waste", "display", "screen"],
+        "Elektronik / E-Waste", "B3 / Elektronik", 180, (0, 0, 255)
+    ),
+    (
+        ["hazardous", "toxic", "chemical", "medical", "mask", "syringe", "aerosol"],
+        "Limbah B3 Berbahaya", "B3 / Elektronik", 180, (0, 0, 255)
+    ),
+    (
+        ["stainless", "steel", "metal", "iron", "aluminum", "aluminium", "tin", "can", "cans", "foil", "copper", "brass", "scrap"],
+        "Stainless / Logam", "Anorganik (Logam)", 90, (220, 220, 220)
+    ),
+    (
+        ["paper", "cardboard", "carton", "book", "box", "magazine", "newspaper", "cellulose"],
+        "Kertas & Karton", "Kertas / Karton", 180, (0, 215, 255)
+    ),
+    (
+        ["plastic", "bottle", "cup", "straw", "poly", "film", "bag", "pet", "hdpe", "pvc"],
+        "Plastik", "Anorganik", 90, (255, 191, 0)
+    ),
+    (
+        ["glass", "jar", "ceramic", "porcelain"],
+        "Kaca & Keramik", "Anorganik", 90, (255, 144, 30)
+    ),
+    (
+        ["organic", "food", "fruit", "vegetable", "leaf", "leaves", "wood", "biological", "bread", "meat", "rice"],
+        "Sampah Organik", "Organik", 0, (0, 255, 0)
+    ),
+]
+
+def resolve_trash_category(raw_class_name):
+    """
+    Menentukan (nama_sampah, jenis_kategori, sudut_servo, bgr_color)
+    secara dinamis & cerdas dari nama class YOLO.
+    """
+    clean_name = str(raw_class_name).strip().lower()
+
+    # 1. Cek Exact Match
+    if clean_name in EXPLICIT_TRASH_MAP:
+        return EXPLICIT_TRASH_MAP[clean_name]
+
+    # 2. Cek Berdasarkan Kata Kunci Semantik (Keyword Substring Match)
+    for keywords, display_name, kategori, angle, color in KEYWORD_RULES:
+        if any(kw in clean_name for kw in keywords):
+            # Format nama objek: contoh "Kabel (cable_type_c)"
+            formatted_name = f"{display_name} ({clean_name})"
+            return (formatted_name, kategori, angle, color)
+
+    # 3. Fallback Umum: Default ke Anorganik jika tidak diketahui
+    return (clean_name.capitalize(), "Anorganik (Umum)", 90, (160, 160, 160))
 
 def probe_available_cameras(max_search=4):
     available = []
@@ -225,8 +300,13 @@ def main():
 
     ser = init_serial(SERIAL_PORT, BAUD_RATE)
 
-    print(f"[YOLO] Memuat model {MODEL_PATH}...")
-    model = YOLO(MODEL_PATH)
+    model_to_use = MODEL_PATH
+    if (model_to_use == "yolo11n.pt" or not os.path.exists(model_to_use)) and os.path.exists("best.pt"):
+        print("[MODEL AUTO] File bobot custom 'best.pt' terdeteksi di direktori! Menggunakan 'best.pt'.")
+        model_to_use = "best.pt"
+
+    print(f"[YOLO] Memuat model {model_to_use}...")
+    model = YOLO(model_to_use)
     print("[YOLO] Model siap digunakan!")
 
     cap = open_camera(active_cam, FRAME_WIDTH, FRAME_HEIGHT)
@@ -322,29 +402,22 @@ def main():
                     if USE_ROI and not (roi_x1 <= cx <= roi_x2 and roi_y1 <= cy <= roi_y2):
                         continue
 
-                    lookup_name = str(cls_name).strip().lower()
-                    if lookup_name in TRASH_MAP:
-                        nama_sampah, jenis_sampah, sudut_servo, color = TRASH_MAP[lookup_name]
+                    if FILTER_PERSON and cls_name == "person":
+                        continue
 
-                        if conf > best_conf:
-                            best_conf = conf
-                            best_name = nama_sampah
-                            best_type = jenis_sampah
-                            best_angle = sudut_servo
+                    nama_sampah, jenis_sampah, sudut_servo, color = resolve_trash_category(cls_name)
 
-                        if SHOW_GUI:
-                            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
-                            label = f"{nama_sampah} [{jenis_sampah}]: {conf*100:.1f}%"
-                            cv2.putText(annotated_frame, label, (x1, max(y1 - 10, 20)),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-                    elif SHOW_GUI:
-                        if FILTER_PERSON and cls_name == "person":
-                            continue
+                    if conf > best_conf:
+                        best_conf = conf
+                        best_name = nama_sampah
+                        best_type = jenis_sampah
+                        best_angle = sudut_servo
 
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (150, 150, 150), 1)
-                        label = f"{cls_name}: {conf*100:.1f}%"
-                        cv2.putText(annotated_frame, label, (x1, max(y1 - 10, 15)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (150, 150, 150), 1)
+                    if SHOW_GUI:
+                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 2)
+                        label = f"{nama_sampah} [{jenis_sampah}]: {conf*100:.1f}%"
+                        cv2.putText(annotated_frame, label, (x1, max(y1 - 10, 20)),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, color, 2)
 
             # Eksekusi servo hanya saat confidence mencapai target minimal (misal >= 80%)
             now = time.time()
