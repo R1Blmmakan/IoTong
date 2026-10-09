@@ -1,7 +1,11 @@
 import os
 import shutil
 import argparse
-from ultralytics.data.utils import check_det_dataset
+
+try:
+    from ultralytics.data.utils import check_det_dataset
+except ImportError:
+    check_det_dataset = None
 
 def merge_all_datasets(output_dir="dataset_raw/yolo_waste_master"):
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -165,11 +169,12 @@ names: {master_classes}
         yf.write(yaml_content)
 
     print(f"      data.yaml berhasil dibuat: {yaml_path}")
-    print("\nMelakukan verifikasi dataset...")
-    try:
-        check_det_dataset(yaml_path)
-    except Exception as e:
-        print(f"[WARN] Verifikasi: {e}")
+    if check_det_dataset:
+        print("\nMelakukan verifikasi dataset...")
+        try:
+            check_det_dataset(yaml_path)
+        except Exception as e:
+            print(f"[WARN] Verifikasi: {e}")
 
     train_c = len(os.listdir(os.path.join(target_dir, "train", "images")))
     val_c = len(os.listdir(os.path.join(target_dir, "valid", "images")))
