@@ -35,8 +35,12 @@ except Exception:
 
 from ultralytics import YOLO
 
-# Prioritaskan dataset gabungan (43 kelas) jika ada, fallback ke TrashType
-default_dataset = "dataset_raw/yolo_waste_merged/data.yaml"
+# Prioritaskan dataset: Master (51k) -> Merged (15k) -> Garbage (36k) -> TrashType (2k)
+default_dataset = "dataset_raw/yolo_waste_master/data.yaml"
+if not os.path.exists(default_dataset):
+    default_dataset = "dataset_raw/yolo_waste_merged/data.yaml"
+if not os.path.exists(default_dataset):
+    default_dataset = "dataset_raw/garbage_v1i/data.yaml"
 if not os.path.exists(default_dataset):
     default_dataset = "dataset_raw/TrashType_Image_Dataset/data.yaml"
 
@@ -47,7 +51,12 @@ if not os.path.exists(dataset_config):
     print(f"[ERROR] Dataset configuration file not found: {dataset_config}")
     exit(1)
 
-model_base = os.getenv("MODEL_BASE", "yolo11n.pt")
+# Prioritaskan bobot terbaik dari training sebelumnya (train-7) jika ada
+default_model = "runs/detect/train-7/weights/best.pt"
+if not os.path.exists(default_model):
+    default_model = "yolo11n.pt"
+
+model_base = os.getenv("MODEL_BASE", default_model)
 epochs = int(os.getenv("EPOCHS", "12"))
 batch_size = int(os.getenv("BATCH", "32"))
 img_size = int(os.getenv("IMGSZ", "640"))
