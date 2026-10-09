@@ -44,7 +44,7 @@ services:
       - HSA_OVERRIDE_GFX_VERSION=9.0.0
       - DEVICE=0
       - EPOCHS=50
-      - BATCH=16
+      - BATCH=32
       - IMGSZ=640
       - AMP=False
     devices:
