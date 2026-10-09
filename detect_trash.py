@@ -41,8 +41,13 @@ TRASH_MAP = {
     "cardboard":    ("Kardus", "Anorganik", 180, (0, 165, 255)),
     "plastic":      ("Plastik", "Anorganik", 90, (255, 191, 0)),
     "organic":      ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
+    "biological":   ("Sampah Hayati / Organik", "Organik", 0, (0, 255, 0)),
     "metal":        ("Logam / Kaleng", "Anorganik", 90, (200, 200, 200)),
     "glass":        ("Kaca", "Anorganik", 90, (255, 144, 30)),
+    "battery":      ("Baterai Bekas", "B3", 180, (0, 0, 255)),
+    "medical-waste":("Limbah Medis / Masker", "B3", 180, (0, 0, 255)),
+    "clothes":      ("Pakaian / Tekstil", "Anorganik", 90, (180, 105, 255)),
+    "shoes":        ("Sepatu / Residu", "Anorganik", 90, (180, 105, 255)),
     "bulky":        ("Sampah Campuran", "Anorganik", 90, (180, 105, 255)),
     "trash":        ("Sampah Umum", "Anorganik", 90, (180, 105, 255)),
 
