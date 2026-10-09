@@ -24,6 +24,8 @@ runs/
 *.engine
 *.zip
 dataset_raw/yolo_waste*/
+dataset_raw/garbage_v1i/
+*.ndjson
 
 
 

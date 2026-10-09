@@ -17,7 +17,7 @@ except ImportError:
 SERIAL_PORT = os.getenv("SERIAL_PORT", "AUTO").strip()
 BAUD_RATE = int(os.getenv("BAUD_RATE", "115200"))
 CONF_THRESHOLD = float(os.getenv("CONF_THRESHOLD", "0.45"))
-SERVO_TRIGGER_CONF = float(os.getenv("SERVO_TRIGGER_CONF", "0.80"))
+SERVO_TRIGGER_CONF = float(os.getenv("SERVO_TRIGGER_CONF", "0.60"))
 ACTION_COOLDOWN = float(os.getenv("ACTION_COOLDOWN", "3.0"))
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
 FRAME_WIDTH = int(os.getenv("FRAME_WIDTH", "640"))
