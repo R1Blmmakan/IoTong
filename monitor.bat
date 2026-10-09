@@ -1,5 +1,8 @@
 @echo off
 rem PlatformIO Dynamic Serial Monitor
+rem Tutup script deteksi yang sedang mengunci port serial agar monitor dapat terbuka
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name like 'python%%'\" -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -match 'detect_trash' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+
 where pio >nul 2>nul
 if %errorlevel% equ 0 (
     pio device monitor %*

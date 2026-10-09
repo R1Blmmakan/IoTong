@@ -3,6 +3,7 @@ import sys
 import time
 import argparse
 import cv2
+cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_SILENT)
 import serial
 import serial.tools.list_ports
 from ultralytics import YOLO
@@ -34,140 +35,136 @@ MAX_BOX_AREA_RATIO = float(os.getenv("MAX_BOX_AREA_RATIO", "0.35"))
 USE_ROI = os.getenv("USE_ROI", "true").lower() in ("true", "1", "yes")
 STABLE_FRAMES_REQUIRED = int(os.getenv("STABLE_FRAMES_REQUIRED", "3"))
 
-# ==============================================================================
-# TAKSONOMI & PEMETAAN KATEGORI SAMPAH FLEKSIBEL (IoTong Smart Taxonomy)
-# ==============================================================================
-# Sudut Servo Fisik IoTong:
-#   - 0°   : Organik (Sisa makanan, buah, sayur, dedaunan)
-#   - 90°  : Anorganik (Plastik, Botol, Kaca, Logam/Stainless)
-#   - 180° : B3 & Elektronik (Kabel, Baterai, PCB, HP, Limbah Berbahaya) / Kertas
-# ==============================================================================
+# Pemetaan sudut servo pemutar wadah (Servo 2) per kategori sampah
+# Posisi netral / standby diatur ke 0 derajat
+ANGLE_ORGANIK = int(os.getenv("ANGLE_ORGANIK", "45"))
+ANGLE_ANORGANIK = int(os.getenv("ANGLE_ANORGANIK", "90"))
+ANGLE_KERTAS = int(os.getenv("ANGLE_KERTAS", "135"))
+ANGLE_B3 = int(os.getenv("ANGLE_B3", "180"))
 
 # 1. Pemetaan Eksplisit (Exact Class Match dari berbagai dataset YOLO)
 EXPLICIT_TRASH_MAP = {
-    # --- E-Waste & Kabel (B3 / Elektronik -> 180°) ---
-    "cable":            ("Kabel Listrik / USB", "B3 / Elektronik", 180, (0, 0, 255)),
-    "cables":           ("Kabel Listrik / USB", "B3 / Elektronik", 180, (0, 0, 255)),
-    "wire":             ("Kabel / Kawat", "B3 / Elektronik", 180, (0, 0, 255)),
-    "wires":            ("Kabel / Kawat", "B3 / Elektronik", 180, (0, 0, 255)),
-    "cable charger":    ("Kabel Charger", "B3 / Elektronik", 180, (0, 0, 255)),
-    "patch cord":       ("Kabel Jaringan LAN", "B3 / Elektronik", 180, (0, 0, 255)),
-    "charger":          ("Charger / Adaptor", "B3 / Elektronik", 180, (0, 0, 255)),
-    "battery":          ("Baterai Bekas", "B3 / Elektronik", 180, (0, 0, 255)),
-    "batteries":        ("Baterai Bekas", "B3 / Elektronik", 180, (0, 0, 255)),
-    "e-waste":          ("Sampah Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
-    "electronics":      ("Komponen Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
-    "electronic":       ("Komponen Elektronik", "B3 / Elektronik", 180, (0, 0, 255)),
-    "pcb":              ("Papan Sirkuit PCB", "B3 / Elektronik", 180, (0, 0, 255)),
-    "circuit board":    ("Papan Sirkuit PCB", "B3 / Elektronik", 180, (0, 0, 255)),
-    "cell phone":       ("Handphone / Gadget", "B3 / Elektronik", 180, (0, 0, 255)),
-    "phone":            ("Handphone / Gadget", "B3 / Elektronik", 180, (0, 0, 255)),
-    "mouse":            ("Mouse Komputer", "B3 / Elektronik", 180, (0, 0, 255)),
-    "keyboard":         ("Keyboard Komputer", "B3 / Elektronik", 180, (0, 0, 255)),
-    "hazardous waste":  ("Limbah Berbahaya (B3)", "B3 / Elektronik", 180, (0, 0, 255)),
-    "medical-waste":    ("Limbah Medis / Masker", "B3 / Elektronik", 180, (0, 0, 255)),
-    "aerosols":         ("Kaleng Semprot / Aerosol", "B3 / Elektronik", 180, (0, 0, 255)),
+    # --- E-Waste & Kabel (B3 / Elektronik) ---
+    "cable":            ("Kabel Listrik / USB", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "cables":           ("Kabel Listrik / USB", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "wire":             ("Kabel / Kawat", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "wires":            ("Kabel / Kawat", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "cable charger":    ("Kabel Charger", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "patch cord":       ("Kabel Jaringan LAN", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "charger":          ("Charger / Adaptor", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "battery":          ("Baterai Bekas", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "batteries":        ("Baterai Bekas", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "e-waste":          ("Sampah Elektronik", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "electronics":      ("Komponen Elektronik", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "electronic":       ("Komponen Elektronik", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "pcb":              ("Papan Sirkuit PCB", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "circuit board":    ("Papan Sirkuit PCB", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "cell phone":       ("Handphone / Gadget", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "phone":            ("Handphone / Gadget", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "mouse":            ("Mouse Komputer", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "keyboard":         ("Keyboard Komputer", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "hazardous waste":  ("Limbah Berbahaya (B3)", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "medical-waste":    ("Limbah Medis / Masker", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
+    "aerosols":         ("Kaleng Semprot / Aerosol", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)),
 
-    # --- Logam, Stainless, & Kaleng (Anorganik Logam -> 90°) ---
-    "stainless":        ("Stainless Steel", "Anorganik (Logam)", 90, (220, 220, 220)),
-    "stainless steel":  ("Stainless Steel", "Anorganik (Logam)", 90, (220, 220, 220)),
-    "metal":            ("Logam / Besi", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "scrap metal":      ("Besi / Logam Bekas", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "metal shavings":   ("Serpihan Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "aluminum can":     ("Kaleng Aluminium", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "aluminum caps":    ("Tutup Aluminium", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "tin":              ("Kaleng Timah", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "iron utensils":    ("Peralatan Besi", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "foil":             ("Aluminium Foil", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "fork":             ("Garpu Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "knife":            ("Pisau Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
-    "spoon":            ("Sendok Logam", "Anorganik (Logam)", 90, (200, 200, 200)),
+    # --- Logam, Stainless, & Kaleng (Anorganik Logam) ---
+    "stainless":        ("Stainless Steel", "Anorganik (Logam)", ANGLE_ANORGANIK, (220, 220, 220)),
+    "stainless steel":  ("Stainless Steel", "Anorganik (Logam)", ANGLE_ANORGANIK, (220, 220, 220)),
+    "metal":            ("Logam / Besi", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "scrap metal":      ("Besi / Logam Bekas", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "metal shavings":   ("Serpihan Logam", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "aluminum can":     ("Kaleng Aluminium", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "aluminum caps":    ("Tutup Aluminium", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "tin":              ("Kaleng Timah", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "iron utensils":    ("Peralatan Besi", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "foil":             ("Aluminium Foil", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "fork":             ("Garpu Logam", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "knife":            ("Pisau Logam", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
+    "spoon":            ("Sendok Logam", "Anorganik (Logam)", ANGLE_ANORGANIK, (200, 200, 200)),
 
-    # --- Plastik, Kaca, & Anorganik Umum (Anorganik -> 90°) ---
-    "plastic":          ("Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic bottle":   ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "bottle":           ("Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "cup":              ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic cup":      ("Gelas Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic bag":      ("Kantong Plastik", "Anorganik", 90, (255, 191, 0)),
-    "plastic caps":     ("Tutup Botol Plastik", "Anorganik", 90, (255, 191, 0)),
-    "glass":            ("Kaca", "Anorganik", 90, (255, 144, 30)),
-    "glass bottle":     ("Botol Kaca", "Anorganik", 90, (255, 144, 30)),
-    "ceramic":          ("Keramik", "Anorganik", 90, (255, 144, 30)),
-    "recyclable":       ("Sampah Daur Ulang", "Anorganik", 90, (255, 191, 0)),
-    "trash":            ("Sampah Anorganik", "Anorganik", 90, (180, 105, 255)),
-    "clothes":          ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
-    "textile":          ("Kain / Tekstil", "Anorganik", 90, (180, 105, 255)),
+    # --- Plastik, Kaca, & Anorganik Umum ---
+    "plastic":          ("Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "plastic bottle":   ("Botol Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "bottle":           ("Botol Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "cup":              ("Gelas Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "plastic cup":      ("Gelas Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "plastic bag":      ("Kantong Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "plastic caps":     ("Tutup Botol Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "glass":            ("Kaca", "Anorganik", ANGLE_ANORGANIK, (255, 144, 30)),
+    "glass bottle":     ("Botol Kaca", "Anorganik", ANGLE_ANORGANIK, (255, 144, 30)),
+    "ceramic":          ("Keramik", "Anorganik", ANGLE_ANORGANIK, (255, 144, 30)),
+    "recyclable":       ("Sampah Daur Ulang", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)),
+    "trash":            ("Sampah Anorganik", "Anorganik", ANGLE_ANORGANIK, (180, 105, 255)),
+    "clothes":          ("Kain / Tekstil", "Anorganik", ANGLE_ANORGANIK, (180, 105, 255)),
+    "textile":          ("Kain / Tekstil", "Anorganik", ANGLE_ANORGANIK, (180, 105, 255)),
 
-    # --- Kertas & Kardus (Anorganik Kertas -> 180° atau 90°) ---
-    "paper":            ("Kertas", "Kertas / Karton", 180, (0, 215, 255)),
-    "cardboard":        ("Kardus", "Kertas / Karton", 180, (0, 165, 255)),
-    "book":             ("Buku / Kertas", "Kertas / Karton", 180, (0, 215, 255)),
-    "paper bag":        ("Kantong Kertas", "Kertas / Karton", 180, (0, 215, 255)),
-    "paper cups":       ("Gelas Kertas", "Kertas / Karton", 180, (0, 215, 255)),
-    "tetra pack":       ("Karton Kemasan", "Kertas / Karton", 180, (0, 165, 255)),
+    # --- Kertas & Kardus ---
+    "paper":            ("Kertas", "Kertas / Karton", ANGLE_KERTAS, (0, 215, 255)),
+    "cardboard":        ("Kardus", "Kertas / Karton", ANGLE_KERTAS, (0, 165, 255)),
+    "book":             ("Buku / Kertas", "Kertas / Karton", ANGLE_KERTAS, (0, 215, 255)),
+    "paper bag":        ("Kantong Kertas", "Kertas / Karton", ANGLE_KERTAS, (0, 215, 255)),
+    "paper cups":       ("Gelas Kertas", "Kertas / Karton", ANGLE_KERTAS, (0, 215, 255)),
+    "tetra pack":       ("Karton Kemasan", "Kertas / Karton", ANGLE_KERTAS, (0, 165, 255)),
 
-    # --- Organik (Organik -> 0°) ---
-    "organic":          ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "biological":       ("Sampah Organik", "Organik", 0, (0, 255, 0)),
-    "food":             ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "banana":           ("Kulit Buah", "Organik", 0, (0, 255, 0)),
-    "apple":            ("Sisa Buah", "Organik", 0, (0, 255, 0)),
-    "orange":           ("Sisa Buah", "Organik", 0, (0, 255, 0)),
-    "sandwich":         ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "pizza":            ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "donut":            ("Sisa Makanan", "Organik", 0, (0, 255, 0)),
-    "vegetable":        ("Sayuran", "Organik", 0, (0, 255, 0)),
-    "wood":             ("Kayu / Ranting", "Organik", 0, (0, 255, 0)),
+    # --- Organik ---
+    "organic":          ("Sisa Makanan", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "biological":       ("Sampah Organik", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "food":             ("Sisa Makanan", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "banana":           ("Kulit Buah", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "apple":            ("Sisa Buah", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "orange":           ("Sisa Buah", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "sandwich":         ("Sisa Makanan", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "pizza":            ("Sisa Makanan", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "donut":            ("Sisa Makanan", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "vegetable":        ("Sayuran", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
+    "wood":             ("Kayu / Ranting", "Organik", ANGLE_ORGANIK, (0, 255, 0)),
 }
 
 # 2. Aturan Kata Kunci Semantik (Dynamic Keyword Fallback)
-# Jika ada class baru hasil training yang belum didaftarkan di EXPLICIT_TRASH_MAP,
-# sistem otomatis mencocokkan kata kunci ke kategori dan sudut servo yang tepat:
 KEYWORD_RULES = [
     # (daftar_kata_kunci, nama_display, kategori_display, sudut_servo, bgr_color)
     (
         ["cable", "wire", "cord", "charger", "usb", "patch", "lan", "lead"],
-        "Kabel / Kabel Charger", "B3 / Elektronik", 180, (0, 0, 255)
+        "Kabel / Kabel Charger", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)
     ),
     (
         ["battery", "batteries", "accumulator", "cell", "powerbank"],
-        "Baterai / Sel Daya", "B3 / Elektronik", 180, (0, 0, 255)
+        "Baterai / Sel Daya", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)
     ),
     (
         ["electronic", "pcb", "circuit", "chip", "phone", "hardware", "laptop", "mouse", "keyboard", "e-waste", "display", "screen"],
-        "Elektronik / E-Waste", "B3 / Elektronik", 180, (0, 0, 255)
+        "Elektronik / E-Waste", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)
     ),
     (
         ["hazardous", "toxic", "chemical", "medical", "mask", "syringe", "aerosol"],
-        "Limbah B3 Berbahaya", "B3 / Elektronik", 180, (0, 0, 255)
+        "Limbah B3 Berbahaya", "B3 / Elektronik", ANGLE_B3, (0, 0, 255)
     ),
     (
         ["stainless", "steel", "metal", "iron", "aluminum", "aluminium", "tin", "can", "cans", "foil", "copper", "brass", "scrap"],
-        "Stainless / Logam", "Anorganik (Logam)", 90, (220, 220, 220)
+        "Stainless / Logam", "Anorganik (Logam)", ANGLE_ANORGANIK, (220, 220, 220)
     ),
     (
         ["paper", "cardboard", "carton", "book", "box", "magazine", "newspaper", "cellulose"],
-        "Kertas & Karton", "Kertas / Karton", 180, (0, 215, 255)
+        "Kertas & Karton", "Kertas / Karton", ANGLE_KERTAS, (0, 215, 255)
     ),
     (
         ["plastic", "bottle", "cup", "straw", "poly", "film", "bag", "pet", "hdpe", "pvc"],
-        "Plastik", "Anorganik", 90, (255, 191, 0)
+        "Plastik", "Anorganik", ANGLE_ANORGANIK, (255, 191, 0)
     ),
     (
         ["glass", "jar", "ceramic", "porcelain"],
-        "Kaca & Keramik", "Anorganik", 90, (255, 144, 30)
+        "Kaca & Keramik", "Anorganik", ANGLE_ANORGANIK, (255, 144, 30)
     ),
     (
         ["organic", "food", "fruit", "vegetable", "leaf", "leaves", "wood", "biological", "bread", "meat", "rice"],
-        "Sampah Organik", "Organik", 0, (0, 255, 0)
+        "Sampah Organik", "Organik", ANGLE_ORGANIK, (0, 255, 0)
     ),
 ]
 
 def resolve_trash_category(raw_class_name):
     """
     Menentukan (nama_sampah, jenis_kategori, sudut_servo, bgr_color)
-    secara dinamis & cerdas dari nama class YOLO.
+    secara dinamis dari nama class YOLO.
     """
     clean_name = str(raw_class_name).strip().lower()
 
@@ -178,12 +175,11 @@ def resolve_trash_category(raw_class_name):
     # 2. Cek Berdasarkan Kata Kunci Semantik (Keyword Substring Match)
     for keywords, display_name, kategori, angle, color in KEYWORD_RULES:
         if any(kw in clean_name for kw in keywords):
-            # Format nama objek: contoh "Kabel (cable_type_c)"
             formatted_name = f"{display_name} ({clean_name})"
             return (formatted_name, kategori, angle, color)
 
     # 3. Fallback Umum: Default ke Anorganik jika tidak diketahui
-    return (clean_name.capitalize(), "Anorganik (Umum)", 90, (160, 160, 160))
+    return (clean_name.capitalize(), "Anorganik (Umum)", ANGLE_ANORGANIK, (160, 160, 160))
 
 def probe_available_cameras(max_search=4):
     available = []
@@ -273,6 +269,7 @@ def init_serial(port_name, baud):
     try:
         ser = serial.Serial(actual_port, baud, timeout=1)
         time.sleep(2)  # Delay inisialisasi boot serial ESP32
+        ser.reset_input_buffer()
         print(f"[SERIAL] Berhasil terhubung ke ESP32 di {actual_port}!")
         return ser
     except Exception as e:
@@ -280,11 +277,21 @@ def init_serial(port_name, baud):
         print("[SERIAL] Mode Simulasi Berjalan (Hanya visualisasi webcam).")
         return None
 
-def send_servo_command(ser, angle):
+def send_sort_command(ser, bin_angle, trash_name="", trash_type=""):
     if ser and ser.is_open:
-        cmd = f"pos {angle}\n"
+        cmd = f"sort {bin_angle}\n"
         ser.write(cmd.encode())
-        print(f">> [ESP32 SENT] Mengirim perintah: {cmd.strip()}")
+        print(f">> [ESP32 SENT] {cmd.strip()} (Wadah/Servo2: {bin_angle} deg -> Trapdoor: buka 0 deg, tutup 180 deg -> wadah kembali ke 0 deg)")
+    else:
+        print(f">> [SIMULASI DUAL SERVO] '{trash_name}' [{trash_type}]:")
+        print(f"   1. Wadah (Servo 2) memutar ke {bin_angle} deg.")
+        print(f"   2. Wadah berhenti, jeda 1 detik.")
+        print(f"   3. Trapdoor (Servo 1) membuka ke 0 deg (putar 180 deg).")
+        print(f"   4. Trapdoor (Servo 1) menutup kembali ke 180 deg.")
+        print(f"   5. Wadah (Servo 2) kembali ke posisi netral (0 deg).")
+
+def send_servo_command(ser, angle):
+    send_sort_command(ser, angle)
 
 def main():
     parser = argparse.ArgumentParser(description="IoTong AI Waste Detection")
@@ -419,7 +426,15 @@ def main():
                         cv2.putText(annotated_frame, label, (x1, max(y1 - 10, 20)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.52, color, 2)
 
-            # Eksekusi servo hanya saat confidence mencapai target minimal (misal >= 80%)
+            if ser and ser.in_waiting > 0:
+                try:
+                    esp_response = ser.readline().decode("utf-8", errors="ignore").strip()
+                    if esp_response:
+                        print(f"[ESP32] {esp_response}")
+                except Exception:
+                    pass
+
+            # Eksekusi servo hanya saat confidence mencapai target minimal
             now = time.time()
             if best_conf >= SERVO_TRIGGER_CONF:
                 if best_name == candidate_name:
@@ -432,8 +447,8 @@ def main():
 
                 if (candidate_count >= STABLE_FRAMES_REQUIRED) and (now - last_action_time > ACTION_COOLDOWN):
                     last_action_time = now
-                    current_status = f"{candidate_name} [{candidate_type}] {best_conf*100:.0f}% -> Servo {candidate_angle} deg"
-                    send_servo_command(ser, candidate_angle)
+                    current_status = f"{candidate_name} [{candidate_type}] {best_conf*100:.0f}% -> Wadah {candidate_angle} deg + Trapdoor (180->0 deg)"
+                    send_sort_command(ser, candidate_angle, candidate_name, candidate_type)
                     candidate_count = 0
             elif best_name is not None:
                 candidate_count = 0
@@ -444,12 +459,11 @@ def main():
             if SHOW_GUI:
                 cv2.rectangle(annotated_frame, (10, 10), (630, 80), (20, 20, 20), -1)
                 cv2.putText(annotated_frame, f"Status: {current_status}", (20, 35),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 255), 2)
-                flip_txt = "AKTIF" if is_flipped else "NONAKTIF"
-                trigger_pct = int(SERVO_TRIGGER_CONF * 100)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 255, 255), 2)
                 cam_label = f"Cam [{active_cam}]"
-                cv2.putText(annotated_frame, f"{cam_label} | Trigger: >={trigger_pct}% | [C] Ganti Cam | [M] Flip", (20, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.40, (200, 200, 200), 1)
+                trigger_pct = int(SERVO_TRIGGER_CONF * 100)
+                cv2.putText(annotated_frame, f"{cam_label} | Trigger >={trigger_pct}% | Wadah(S2) + Trapdoor 180->0 deg(S1) | [C] Cam | [M] Flip", (20, 65),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.36, (200, 200, 200), 1)
 
                 cv2.imshow("IoTong AI Detection", annotated_frame)
 
@@ -483,8 +497,8 @@ def main():
         if SHOW_GUI:
             cv2.destroyAllWindows()
         if ser and ser.is_open:
-            # Kembalikan ke posisi netral sebelum keluar
-            send_servo_command(ser, 90)
+            ser.write(b"trapdoor close\n")
+            ser.write(b"pos2 0\n")
             ser.close()
         print("[EXIT] Program deteksi selesai.")
 
